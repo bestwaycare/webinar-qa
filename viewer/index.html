@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ウェビナー質問チャット</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: #eef2f7;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 28px rgba(0,0,0,0.11);
+      width: 100%;
+      max-width: 480px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- ヘッダー ---- */
+    .chat-header {
+      background: #4f46e5;
+      color: #fff;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .avatar {
+      width: 38px; height: 38px;
+      background: rgba(255,255,255,0.25);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem;
+    }
+    .chat-header .info .name { font-weight: 700; font-size: 0.95rem; }
+    .chat-header .info .sub  { font-size: 0.75rem; opacity: 0.8; }
+    .online-dot {
+      width: 8px; height: 8px;
+      background: #4ade80;
+      border-radius: 50%;
+      margin-left: auto;
+      box-shadow: 0 0 0 2px rgba(74,222,128,0.3);
+    }
+
+    /* ---- 入力フォーム（初期画面） ---- */
+    #formView { padding: 28px; }
+    #formView h2 { font-size: 1rem; color: #374151; margin-bottom: 4px; }
+    #formView p  { font-size: 0.82rem; color: #9ca3af; margin-bottom: 22px; }
+    label { display: block; font-size: 0.8rem; font-weight: 600; color: #6b7280; margin-bottom: 5px; }
+    input, textarea {
+      width: 100%;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 10px 13px;
+      font-size: 0.93rem;
+      color: #111827;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 14px;
+    }
+    input:focus, textarea:focus { border-color: #4f46e5; }
+    textarea { resize: vertical; min-height: 100px; }
+    .btn-primary {
+      width: 100%;
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-primary:disabled { background: #9ca3af; cursor: not-allowed; }
+    .err { font-size: 0.82rem; color: #ef4444; margin-top: 8px; display: none; }
+
+    /* ---- チャット画面 ---- */
+    #chatView { display: none; flex-direction: column; height: 480px; }
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .bubble-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .bubble-wrap.me   { align-items: flex-end; }
+    .bubble-wrap.them { align-items: flex-start; }
+
+    .bubble {
+      max-width: 78%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .bubble-wrap.me .bubble {
+      background: #4f46e5;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .bubble-wrap.them .bubble {
+      background: #f3f4f6;
+      color: #111827;
+      border-bottom-left-radius: 4px;
+    }
+    .bubble-time {
+      font-size: 0.68rem;
+      color: #9ca3af;
+      padding: 0 4px;
+    }
+    .waiting {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.82rem;
+      color: #9ca3af;
+      padding: 4px 0;
+    }
+    .dots span {
+      display: inline-block;
+      width: 5px; height: 5px;
+      background: #9ca3af;
+      border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%,80%,100% { transform: translateY(0); }
+      40%          { transform: translateY(-5px); }
+    }
+
+    /* 追加質問エリア */
+    .input-area {
+      border-top: 1px solid #f3f4f6;
+      padding: 12px;
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    .input-area textarea {
+      flex: 1;
+      margin: 0;
+      min-height: 40px;
+      max-height: 120px;
+      border-radius: 20px;
+      padding: 9px 14px;
+      font-size: 0.88rem;
+    }
+    .send-btn {
+      width: 40px; height: 40px;
+      background: #4f46e5;
+      border: none;
+      border-radius: 50%;
+      color: #fff;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .send-btn:hover { background: #4338ca; }
+    .send-btn:disabled { background: #d1d5db; cursor: not-allowed; }
+    .send-btn svg { width: 18px; height: 18px; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="chat-header">
+    <div class="avatar">🎓</div>
+    <div class="info">
+      <div class="name">ウェビナー質問チャット</div>
+      <div class="sub">講師が順番に回答します</div>
+    </div>
+    <div class="online-dot"></div>
+  </div>
+
+  <!-- 初期フォーム -->
+  <div id="formView">
+    <h2>はじめに教えてください</h2>
+    <p>質問はチャット形式で送れます。回答はこの画面に届きます。</p>
+    <form id="initForm">
+      <label for="name">お名前</label>
+      <input type="text" id="name" placeholder="山田 太郎" required autocomplete="name">
+
+      <label for="email">メールアドレス</label>
+      <input type="email" id="email" placeholder="you@example.com" required autocomplete="email">
+
+      <label for="firstQ">最初の質問</label>
+      <textarea id="firstQ" placeholder="質問を入力してください..." required></textarea>
+
+      <button type="submit" class="btn-primary" id="startBtn">チャットを始める</button>
+      <div class="err" id="formErr">送信に失敗しました。もう一度お試しください。</div>
+    </form>
+  </div>
+
+  <!-- チャット画面 -->
+  <div id="chatView">
+    <div class="messages" id="messages"></div>
+    <div class="input-area">
+      <textarea id="newQ" placeholder="追加の質問を入力..." rows="1"></textarea>
+      <button class="send-btn" id="sendBtn" title="送信">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ★ GASのWebアプリURLをここに貼り付け
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbztc80OI7FSqZ0xIszvSj9ECGp1ugsOvZQ4DOoO7yWxTkKJgLfbqpcEqkQXl_sWBblw/exec';
+
+  // セッション状態
+  let session = JSON.parse(localStorage.getItem('webinar_session') || 'null');
+  let questions = []; // { id, text, status, reply, repliedAt }
+  let pollTimer = null;
+
+  // ---------------------------------------------------
+  //  起動時: セッション復元
+  // ---------------------------------------------------
+  if (session) {
+    showChat();
+    loadMyQuestions();
+    startPolling();
+  }
+
+  // ---------------------------------------------------
+  //  初期フォーム送信
+  // ---------------------------------------------------
+  document.getElementById('initForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('startBtn');
+    const err = document.getElementById('formErr');
+    btn.disabled = true;
+    btn.textContent = '送信中...';
+    err.style.display = 'none';
+
+    const name     = document.getElementById('name').value.trim();
+    const email    = document.getElementById('email').value.trim();
+    const question = document.getElementById('firstQ').value.trim();
+
+    try {
+      const id = await postQuestion(name, email, question);
+      session = { name, email };
+      localStorage.setItem('webinar_session', JSON.stringify(session));
+
+      questions = [{ id, text: question, status: '未回答', reply: '', repliedAt: '', time: now() }];
+      showChat();
+      renderMessages();
+      startPolling();
+    } catch {
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'チャットを始める';
+    }
+  });
+
+  // ---------------------------------------------------
+  //  追加質問送信
+  // ---------------------------------------------------
+  document.getElementById('sendBtn').addEventListener('click', sendNewQ);
+  document.getElementById('newQ').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendNewQ(); }
+  });
+
+  async function sendNewQ() {
+    const ta  = document.getElementById('newQ');
+    const btn = document.getElementById('sendBtn');
+    const text = ta.value.trim();
+    if (!text || !session) return;
+
+    btn.disabled = true;
+    ta.disabled = true;
+
+    try {
+      const id = await postQuestion(session.name, session.email, text);
+      questions.push({ id, text, status: '未回答', reply: '', repliedAt: '', time: now() });
+      ta.value = '';
+      renderMessages();
+    } catch {
+      alert('送信に失敗しました。もう一度お試しください。');
+    } finally {
+      btn.disabled = false;
+      ta.disabled = false;
+      ta.focus();
+    }
+  }
+
+  // ---------------------------------------------------
+  //  ポーリング（10秒ごと）
+  // ---------------------------------------------------
+  function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(loadMyQuestions, 10000);
+  }
+
+  async function loadMyQuestions() {
+    if (!session) return;
+    try {
+      const res  = await fetch(`${GAS_URL}?action=listByEmail&email=${encodeURIComponent(session.email)}`);
+      const data = await res.json();
+      if (data.status !== 'ok') return;
+
+      let updated = false;
+      data.questions.forEach(q => {
+        const local = questions.find(lq => lq.id === q.id);
+        if (local) {
+          if (local.status !== q.status || local.reply !== q.reply) {
+            local.status = q.status;
+            local.reply  = q.reply;
+            local.repliedAt = q.repliedAt;
+            updated = true;
+          }
+        } else {
+          // 他デバイスから送信された質問を復元
+          questions.push({ id: q.id, text: q.question, status: q.status, reply: q.reply, repliedAt: q.repliedAt, time: q.timestamp });
+          updated = true;
+        }
+      });
+      if (updated) renderMessages();
+    } catch { /* ネットワークエラーは無視 */ }
+  }
+
+  // ---------------------------------------------------
+  //  メッセージ描画
+  // ---------------------------------------------------
+  function renderMessages() {
+    const box = document.getElementById('messages');
+    let html = '';
+
+    questions.forEach(q => {
+      // 自分の質問
+      html += `<div class="bubble-wrap me">
+        <div class="bubble">${esc(q.text)}</div>
+        <span class="bubble-time">${q.time || ''}</span>
+      </div>`;
+
+      // 回答
+      if (q.status === '回答済' && q.reply) {
+        html += `<div class="bubble-wrap them">
+          <div class="bubble">${esc(q.reply)}</div>
+          <span class="bubble-time">講師 · ${q.repliedAt || ''}</span>
+        </div>`;
+      } else {
+        html += `<div class="waiting">
+          <div class="dots"><span></span><span></span><span></span></div>
+          講師が確認中です
+        </div>`;
+      }
+    });
+
+    box.innerHTML = html;
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // ---------------------------------------------------
+  //  ユーティリティ
+  // ---------------------------------------------------
+  async function postQuestion(name, email, question) {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ name, email, question }),
+    });
+    const data = await res.json();
+    if (data.status !== 'ok') throw new Error(data.message);
+    return data.id;
+  }
+
+  function showChat() {
+    document.getElementById('formView').style.display = 'none';
+    document.getElementById('chatView').style.display = 'flex';
+  }
+
+  function now() {
+    return new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  }
+</script>
+</body>
+</html>
