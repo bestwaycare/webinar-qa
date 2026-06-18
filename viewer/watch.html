@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ウェビナー視聴</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: 'Helvetica Neue', Arial, sans-serif; background: #0f172a; color: #1e293b; }
+
+    .layout {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* ---- 動画エリア ---- */
+    .video-area {
+      flex: 0 0 58%;
+      background: #000;
+      position: relative;
+    }
+    .video-area iframe {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0; left: 0;
+      border: none;
+    }
+    .video-placeholder {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      color: #475569; font-size: 0.9rem;
+      flex-direction: column; gap: 10px;
+    }
+    .video-placeholder .icon { font-size: 2.5rem; }
+
+    /* ---- チャットエリア ---- */
+    .chat-area {
+      flex: 1;
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* チャットヘッダー */
+    .chat-header {
+      background: #4f46e5;
+      color: #fff;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .chat-header .title { font-size: 0.88rem; font-weight: 700; }
+    .chat-header .dot {
+      width: 7px; height: 7px;
+      background: #4ade80; border-radius: 50%;
+      margin-left: auto;
+      box-shadow: 0 0 0 2px rgba(74,222,128,0.3);
+    }
+
+    /* 入力フォーム（初期） */
+    #formView {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+    }
+    #formView p { font-size: 0.8rem; color: #64748b; margin-bottom: 14px; }
+    label { display: block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 4px; }
+    input {
+      width: 100%; border: 1.5px solid #e2e8f0; border-radius: 8px;
+      padding: 9px 12px; font-size: 0.9rem; outline: none; margin-bottom: 10px;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: #4f46e5; }
+    .btn-start {
+      width: 100%; background: #4f46e5; color: #fff; border: none;
+      border-radius: 8px; padding: 11px; font-size: 0.92rem; font-weight: 700;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .btn-start:hover { background: #4338ca; }
+    .btn-start:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    /* チャット画面 */
+    #chatView { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    .messages {
+      flex: 1; overflow-y: auto; padding: 12px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .bubble-wrap { display: flex; flex-direction: column; gap: 2px; }
+    .bubble-wrap.me   { align-items: flex-end; }
+    .bubble-wrap.them { align-items: flex-start; }
+    .bubble {
+      max-width: 80%; padding: 8px 12px; border-radius: 16px;
+      font-size: 0.85rem; line-height: 1.5; word-break: break-word;
+    }
+    .bubble-wrap.me .bubble {
+      background: #4f46e5; color: #fff; border-bottom-right-radius: 4px;
+    }
+    .bubble-wrap.them .bubble {
+      background: #fff; color: #1e293b; border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .bubble-time { font-size: 0.65rem; color: #94a3b8; padding: 0 4px; }
+    .waiting {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.75rem; color: #94a3b8;
+    }
+    .dots span {
+      display: inline-block; width: 4px; height: 4px;
+      background: #94a3b8; border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%,80%,100% { transform: translateY(0); }
+      40%          { transform: translateY(-4px); }
+    }
+    .input-row {
+      border-top: 1px solid #e2e8f0; padding: 8px;
+      display: flex; gap: 6px; align-items: flex-end; flex-shrink: 0;
+    }
+    .input-row textarea {
+      flex: 1; border: 1.5px solid #e2e8f0; border-radius: 18px;
+      padding: 8px 12px; font-size: 0.85rem; resize: none;
+      min-height: 36px; max-height: 90px; outline: none;
+      transition: border-color 0.2s; font-family: inherit;
+    }
+    .input-row textarea:focus { border-color: #4f46e5; }
+    .send-btn {
+      width: 36px; height: 36px; background: #4f46e5; border: none;
+      border-radius: 50%; color: #fff; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .send-btn:hover { background: #4338ca; }
+    .send-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+    .send-btn svg { width: 16px; height: 16px; }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- 動画エリア -->
+  <div class="video-area" id="videoArea">
+    <div class="video-placeholder" id="videoPlaceholder">
+      <span class="icon">📡</span>
+      <span>配信開始までお待ちください</span>
+    </div>
+  </div>
+
+  <!-- チャットエリア -->
+  <div class="chat-area">
+    <div class="chat-header">
+      <span>💬</span>
+      <span class="title" id="chatTitle">質問チャット</span>
+      <div class="dot"></div>
+    </div>
+
+    <!-- 初期フォーム -->
+    <div id="formView">
+      <p>お名前とメールアドレスを入力すると質問できます。</p>
+      <form id="initForm">
+        <label>お名前</label>
+        <input type="text" id="name" placeholder="山田 太郎" required autocomplete="name">
+        <label>メールアドレス</label>
+        <input type="email" id="email" placeholder="you@example.com" required autocomplete="email">
+        <label>最初の質問</label>
+        <input type="text" id="firstQ" placeholder="質問を入力してください..." required>
+        <button type="submit" class="btn-start" id="startBtn">質問を送る</button>
+      </form>
+    </div>
+
+    <!-- チャット -->
+    <div id="chatView">
+      <div class="messages" id="messages"></div>
+      <div class="input-row">
+        <textarea id="newQ" placeholder="追加の質問..." rows="1"></textarea>
+        <button class="send-btn" id="sendBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbymH9UaIIpVFHi_ggmOuOiifQpoMrhuPAnV3jOvdppcGi6klMgG00lGdOEHfqV_zU0y/exec';
+
+  let session  = JSON.parse(localStorage.getItem('webinar_session') || 'null');
+  let questions = [];
+  let pollTimer = null;
+
+  // 起動時: 動画URL・タイトル取得
+  (async () => {
+    try {
+      const [vRes, tRes] = await Promise.all([
+        fetch(`${GAS_URL}?action=getVideoUrl`),
+        fetch(`${GAS_URL}?action=getTitle`),
+      ]);
+      const vData = await vRes.json();
+      const tData = await tRes.json();
+
+      if (tData.status === 'ok') {
+        document.getElementById('chatTitle').textContent = tData.title + ' - 質問チャット';
+        document.title = tData.title;
+      }
+      if (vData.status === 'ok' && vData.url) {
+        const placeholder = document.getElementById('videoPlaceholder');
+        const iframe = document.createElement('iframe');
+        iframe.src = vData.url.includes('?') ? vData.url + '&embed=true' : vData.url + '?embed=true';
+        iframe.allow = 'autoplay; fullscreen';
+        iframe.allowFullscreen = true;
+        placeholder.replaceWith(iframe);
+      }
+    } catch {}
+  })();
+
+  // セッション復元
+  if (session) { showChat(); loadMyQuestions(); startPolling(); }
+
+  // フォーム送信
+  document.getElementById('initForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('startBtn');
+    btn.disabled = true; btn.textContent = '送信中...';
+    const name     = document.getElementById('name').value.trim();
+    const email    = document.getElementById('email').value.trim();
+    const question = document.getElementById('firstQ').value.trim();
+    try {
+      const id = await postQuestion(name, email, question);
+      session = { name, email };
+      localStorage.setItem('webinar_session', JSON.stringify(session));
+      questions = [{ id, text: question, status: '未回答', reply: '', repliedAt: '', time: now() }];
+      showChat(); renderMessages(); startPolling();
+    } catch {
+      btn.disabled = false; btn.textContent = '質問を送る';
+    }
+  });
+
+  // 追加質問
+  document.getElementById('sendBtn').addEventListener('click', sendNewQ);
+  document.getElementById('newQ').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendNewQ(); }
+  });
+
+  async function sendNewQ() {
+    const ta  = document.getElementById('newQ');
+    const btn = document.getElementById('sendBtn');
+    const text = ta.value.trim();
+    if (!text || !session) return;
+    btn.disabled = true; ta.disabled = true;
+    try {
+      const id = await postQuestion(session.name, session.email, text);
+      questions.push({ id, text, status: '未回答', reply: '', repliedAt: '', time: now() });
+      ta.value = ''; renderMessages();
+    } catch {}
+    finally { btn.disabled = false; ta.disabled = false; ta.focus(); }
+  }
+
+  function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(loadMyQuestions, 10000);
+  }
+
+  async function loadMyQuestions() {
+    if (!session) return;
+    try {
+      const res  = await fetch(`${GAS_URL}?action=listByEmail&email=${encodeURIComponent(session.email)}`);
+      const data = await res.json();
+      if (data.status !== 'ok') return;
+      let updated = false;
+      data.questions.forEach(q => {
+        const local = questions.find(lq => lq.id === q.id);
+        if (local) {
+          if (local.status !== q.status || local.reply !== q.reply) {
+            local.status = q.status; local.reply = q.reply; local.repliedAt = q.repliedAt;
+            updated = true;
+          }
+        } else {
+          questions.push({ id: q.id, text: q.question, status: q.status, reply: q.reply, repliedAt: q.repliedAt, time: q.timestamp });
+          updated = true;
+        }
+      });
+      if (updated) renderMessages();
+    } catch {}
+  }
+
+  function renderMessages() {
+    const box = document.getElementById('messages');
+    box.innerHTML = questions.map(q => `
+      <div class="bubble-wrap me">
+        <div class="bubble">${esc(q.text)}</div>
+        <span class="bubble-time">${q.time || ''}</span>
+      </div>
+      ${q.status === '回答済' && q.reply
+        ? `<div class="bubble-wrap them">
+             <div class="bubble">${esc(q.reply)}</div>
+             <span class="bubble-time">講師 · ${q.repliedAt || ''}</span>
+           </div>`
+        : `<div class="waiting">
+             <div class="dots"><span></span><span></span><span></span></div>
+             講師が確認中です
+           </div>`
+      }
+    `).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function postQuestion(name, email, question) {
+    const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ name, email, question }) });
+    const data = await res.json();
+    if (data.status !== 'ok') throw new Error(data.message);
+    return data.id;
+  }
+
+  function showChat() {
+    document.getElementById('formView').style.display = 'none';
+    const cv = document.getElementById('chatView');
+    cv.style.display = 'flex'; cv.style.flexDirection = 'column';
+    cv.style.overflow = 'hidden'; cv.style.flex = '1';
+  }
+
+  function now() {
+    return new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  }
+</script>
+</body>
+</html>

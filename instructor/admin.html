@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>講師用管理画面</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f1f5f9; color: #1e293b; }
+
+    /* ---- ログイン画面 ---- */
+    #loginView {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .login-card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 28px rgba(0,0,0,0.10);
+      padding: 44px 40px;
+      width: 100%; max-width: 380px;
+      text-align: center;
+    }
+    .login-card .icon { font-size: 2.4rem; margin-bottom: 14px; }
+    .login-card h1 { font-size: 1.2rem; margin-bottom: 6px; }
+    .login-card p  { font-size: 0.83rem; color: #94a3b8; margin-bottom: 28px; }
+    .login-card input {
+      width: 100%;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 1rem;
+      text-align: center;
+      letter-spacing: 4px;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 14px;
+    }
+    .login-card input:focus { border-color: #4f46e5; }
+    .login-card .err { font-size: 0.82rem; color: #ef4444; min-height: 20px; margin-bottom: 10px; }
+    .btn-login {
+      width: 100%;
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-login:hover { background: #4338ca; }
+
+    /* ---- 管理画面 ---- */
+    #adminView { display: none; }
+
+    header {
+      background: #1e293b;
+      color: #fff;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      position: sticky; top: 0; z-index: 50;
+    }
+    header h1 { font-size: 1rem; font-weight: 700; }
+    .badge {
+      background: #f59e0b;
+      color: #1e293b;
+      border-radius: 999px;
+      padding: 3px 11px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .header-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+    .refresh-btn, .logout-btn {
+      border: 1.5px solid rgba(255,255,255,0.3);
+      background: none;
+      color: #fff;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .refresh-btn:hover, .logout-btn:hover { background: rgba(255,255,255,0.1); }
+    .auto-label { font-size: 0.72rem; color: #64748b; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 24px 20px; }
+
+
+    /* ---- フィルターバー ---- */
+    .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .filter-btn {
+      border: 1.5px solid #e2e8f0;
+      background: #fff;
+      border-radius: 999px;
+      padding: 5px 16px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: #475569;
+    }
+    .filter-btn.active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+
+    /* ---- 質問カード ---- */
+    .q-list { display: flex; flex-direction: column; gap: 12px; }
+    .q-card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      padding: 18px 22px;
+      border-left: 4px solid #e2e8f0;
+    }
+    .q-card.unanswered { border-left-color: #fb923c; }
+    .q-card.answered   { border-left-color: #4ade80; }
+
+    .q-meta {
+      display: flex; flex-wrap: wrap; align-items: center;
+      gap: 8px; margin-bottom: 10px;
+    }
+    .q-id   { font-size: 0.7rem; color: #94a3b8; font-family: monospace; }
+    .q-name { font-weight: 700; font-size: 0.92rem; }
+    .q-email { font-size: 0.78rem; color: #64748b; }
+    .q-time { font-size: 0.72rem; color: #94a3b8; margin-left: auto; }
+
+    .pill {
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .pill.unanswered { background: #fff7ed; color: #c2410c; }
+    .pill.answered   { background: #f0fdf4; color: #15803d; }
+
+    .q-text { font-size: 0.92rem; line-height: 1.6; margin-bottom: 14px; }
+
+    .reply-area textarea {
+      width: 100%;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 13px;
+      font-size: 0.9rem;
+      resize: vertical;
+      min-height: 72px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .reply-area textarea:focus { border-color: #4f46e5; }
+    .btn-reply {
+      margin-top: 8px;
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 9px;
+      padding: 9px 20px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-reply:hover { background: #4338ca; }
+    .btn-reply:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    .replied-box {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 10px;
+      padding: 12px 15px;
+      margin-top: 10px;
+    }
+    .replied-box .rl { font-size: 0.72rem; font-weight: 700; color: #15803d; margin-bottom: 4px; }
+    .replied-box .rt { font-size: 0.88rem; color: #1e293b; }
+
+    /* ---- タイトル設定 ---- */
+    .title-box {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      padding: 18px 24px;
+      margin-bottom: 16px;
+      border-left: 4px solid #6366f1;
+    }
+    .title-box h2 {
+      font-size: 0.88rem; font-weight: 700; color: #4338ca;
+      margin-bottom: 10px;
+    }
+    .title-row { display: flex; gap: 8px; }
+    .title-row input {
+      flex: 1;
+      border: 1.5px solid #e2e8f0; border-radius: 10px;
+      padding: 9px 13px; font-size: 0.92rem; outline: none;
+      transition: border-color 0.2s;
+    }
+    .title-row input:focus { border-color: #6366f1; }
+    .btn-title {
+      background: #6366f1; color: #fff; border: none;
+      border-radius: 9px; padding: 9px 20px;
+      font-size: 0.88rem; font-weight: 700; cursor: pointer;
+      transition: background 0.2s; white-space: nowrap;
+    }
+    .btn-title:hover { background: #4f46e5; }
+    .btn-title:disabled { background: #94a3b8; cursor: not-allowed; }
+    .title-current { font-size: 0.78rem; color: #94a3b8; margin-top: 6px; }
+
+    .empty { text-align: center; color: #94a3b8; padding: 52px 0; font-size: 0.92rem; }
+
+    .toast {
+      position: fixed; bottom: 22px; right: 22px;
+      background: #1e293b; color: #fff;
+      padding: 11px 20px; border-radius: 10px;
+      font-size: 0.88rem; box-shadow: 0 4px 18px rgba(0,0,0,0.2);
+      opacity: 0; transform: translateY(8px);
+      transition: all 0.25s; z-index: 999; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+
+<!-- ログイン画面 -->
+<div id="loginView">
+  <div class="login-card">
+    <div class="icon">🔐</div>
+    <h1>講師用管理画面</h1>
+    <p>パスワードを入力してください</p>
+    <input type="password" id="pwInput" placeholder="••••••••" autocomplete="current-password">
+    <div class="err" id="pwErr"></div>
+    <button class="btn-login" onclick="login()">ログイン</button>
+  </div>
+</div>
+
+<!-- 管理画面 -->
+<div id="adminView">
+  <header>
+    <h1>講師用管理画面</h1>
+    <span class="badge" id="unreadBadge">---</span>
+    <div class="header-right">
+      <span class="auto-label" id="autoLabel"></span>
+      <button class="refresh-btn" onclick="loadQuestions()">更新</button>
+      <button class="logout-btn" onclick="logout()">ログアウト</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- タイトル設定 -->
+    <div class="title-box">
+      <h2>⚙️ ウェビナータイトル設定</h2>
+      <div class="title-row">
+        <input type="text" id="titleInput" placeholder="ウェビナータイトルを入力...">
+        <button class="btn-title" id="titleBtn" onclick="saveTitle()">保存</button>
+      </div>
+      <div class="title-current" id="titleCurrent"></div>
+    </div>
+
+    <!-- 動画URL設定 -->
+    <div class="title-box" style="margin-top:12px; border-left-color:#0ea5e9;">
+      <h2 style="color:#0369a1;">🎥 StreamYard 動画URL設定</h2>
+      <div class="title-row">
+        <input type="url" id="videoUrlInput" placeholder="https://streamyard.com/watch/xxxxx">
+        <button class="btn-title" id="videoUrlBtn" onclick="saveVideoUrl()" style="background:#0ea5e9;">保存</button>
+      </div>
+      <div class="title-current" id="videoUrlCurrent"></div>
+    </div>
+
+    <!-- フィルター -->
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="setFilter('all',this)">すべて</button>
+      <button class="filter-btn" onclick="setFilter('unanswered',this)">未回答のみ</button>
+      <button class="filter-btn" onclick="setFilter('answered',this)">回答済のみ</button>
+    </div>
+
+    <!-- 質問一覧 -->
+    <div class="q-list" id="qList"><div class="empty">読み込み中...</div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ★ GASのWebアプリURLをここに貼り付け
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbymH9UaIIpVFHi_ggmOuOiifQpoMrhuPAnV3jOvdppcGi6klMgG00lGdOEHfqV_zU0y/exec';
+
+  // ★ パスワードのSHA-256ハッシュ（下の generateHash() で生成）
+  // デフォルト: "webinar2024"
+  const PW_HASH = '9e5a6b3bb88aff6db1c8e55f53150c6d4159afdc3ad78ababea75b338f2da3c0';
+
+  let allQ = [];
+  let currentFilter = 'all';
+  let pollTimer = null;
+
+  // ---------------------------------------------------
+  //  ログイン
+  // ---------------------------------------------------
+  async function login() {
+    const pw  = document.getElementById('pwInput').value;
+    const err = document.getElementById('pwErr');
+    err.textContent = '';
+    const hash = await sha256(pw);
+    if (hash === PW_HASH) {
+      sessionStorage.setItem('admin_auth', '1');
+      showAdmin();
+    } else {
+      err.textContent = 'パスワードが違います';
+      document.getElementById('pwInput').value = '';
+      document.getElementById('pwInput').focus();
+    }
+  }
+
+  document.getElementById('pwInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') login();
+  });
+
+  function logout() {
+    sessionStorage.removeItem('admin_auth');
+    if (pollTimer) clearInterval(pollTimer);
+    document.getElementById('adminView').style.display = 'none';
+    document.getElementById('loginView').style.display = 'flex';
+    document.getElementById('pwInput').value = '';
+  }
+
+  // セッション復元
+  if (sessionStorage.getItem('admin_auth') === '1') showAdmin();
+
+  function showAdmin() {
+    document.getElementById('loginView').style.display = 'none';
+    document.getElementById('adminView').style.display = 'block';
+    loadTitle();
+    loadVideoUrl();
+    loadQuestions();
+    startPolling();
+  }
+
+  // ---------------------------------------------------
+  //  ポーリング（15秒ごと）
+  // ---------------------------------------------------
+  function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    let sec = 15;
+    const tick = () => {
+      sec--;
+      document.getElementById('autoLabel').textContent = `次の更新まで ${sec}s`;
+      if (sec <= 0) { loadQuestions(); sec = 15; }
+    };
+    pollTimer = setInterval(tick, 1000);
+  }
+
+  // ---------------------------------------------------
+  //  タイトル設定
+  // ---------------------------------------------------
+  async function loadTitle() {
+    try {
+      const res  = await fetch(`${GAS_URL}?action=getTitle`);
+      const data = await res.json();
+      if (data.status === 'ok') {
+        document.getElementById('titleInput').value = data.title;
+        document.getElementById('titleCurrent').textContent = `現在: ${data.title}`;
+      }
+    } catch {}
+  }
+
+  async function saveTitle() {
+    const title = document.getElementById('titleInput').value.trim();
+    if (!title) { showToast('タイトルを入力してください'); return; }
+    const btn = document.getElementById('titleBtn');
+    btn.disabled = true; btn.textContent = '保存中...';
+    try {
+      const res  = await fetch(`${GAS_URL}?action=setTitle&title=${enc(title)}`);
+      const data = await res.json();
+      if (data.status === 'ok') {
+        document.getElementById('titleCurrent').textContent = `現在: ${data.title}`;
+        showToast('タイトルを保存しました');
+      } else {
+        showToast('保存に失敗しました');
+      }
+    } catch { showToast('保存に失敗しました'); }
+    finally { btn.disabled = false; btn.textContent = '保存'; }
+  }
+
+  // ---------------------------------------------------
+  //  動画URL設定
+  // ---------------------------------------------------
+  async function loadVideoUrl() {
+    try {
+      const res  = await fetch(`${GAS_URL}?action=getVideoUrl`);
+      const data = await res.json();
+      if (data.status === 'ok') {
+        document.getElementById('videoUrlInput').value = data.url || '';
+        document.getElementById('videoUrlCurrent').textContent = data.url ? `現在: ${data.url}` : '未設定';
+      }
+    } catch {}
+  }
+
+  async function saveVideoUrl() {
+    const url = document.getElementById('videoUrlInput').value.trim();
+    if (!url) { showToast('URLを入力してください'); return; }
+    const btn = document.getElementById('videoUrlBtn');
+    btn.disabled = true; btn.textContent = '保存中...';
+    try {
+      const res  = await fetch(`${GAS_URL}?action=setVideoUrl&url=${enc(url)}`);
+      const data = await res.json();
+      if (data.status === 'ok') {
+        document.getElementById('videoUrlCurrent').textContent = `現在: ${data.url}`;
+        showToast('動画URLを保存しました');
+      } else {
+        showToast('保存に失敗しました');
+      }
+    } catch { showToast('保存に失敗しました'); }
+    finally { btn.disabled = false; btn.textContent = '保存'; }
+  }
+
+  // ---------------------------------------------------
+  //  質問一覧取得
+  // ---------------------------------------------------
+  async function loadQuestions() {
+    try {
+      const res  = await fetch(`${GAS_URL}?action=list`);
+      const data = await res.json();
+      if (data.status === 'ok') {
+        allQ = data.questions.reverse();
+        renderList();
+      }
+    } catch { showToast('データ取得に失敗しました'); }
+  }
+
+  function renderList() {
+    const unanswered = allQ.filter(q => q.status === '未回答').length;
+    document.getElementById('unreadBadge').textContent = `未回答 ${unanswered} 件`;
+
+    const filtered = allQ.filter(q => {
+      if (currentFilter === 'unanswered') return q.status === '未回答';
+      if (currentFilter === 'answered')   return q.status === '回答済';
+      return true;
+    });
+
+    const el = document.getElementById('qList');
+    if (!filtered.length) { el.innerHTML = '<div class="empty">質問はありません</div>'; return; }
+
+    el.innerHTML = filtered.map(q => `
+      <div class="q-card ${q.status === '未回答' ? 'unanswered' : 'answered'}" id="card-${q.id}">
+        <div class="q-meta">
+          <span class="q-id">${q.id}</span>
+          <span class="q-name">${esc(q.name)}</span>
+          <span class="q-email">${esc(q.email)}</span>
+          <span class="pill ${q.status === '未回答' ? 'unanswered' : 'answered'}">${q.status}</span>
+          <span class="q-time">${q.timestamp}</span>
+        </div>
+        <div class="q-text">${esc(q.question)}</div>
+        ${q.status === '回答済'
+          ? `<div class="replied-box">
+               <div class="rl">回答済 · ${q.repliedAt}</div>
+               <div class="rt">${esc(q.reply)}</div>
+             </div>`
+          : `<div class="reply-area">
+               <textarea id="r-${q.id}" placeholder="${esc(q.name)} さんへの返信..."></textarea>
+               <button class="btn-reply" onclick="sendReply('${q.id}')">返信を送信</button>
+             </div>`
+        }
+      </div>
+    `).join('');
+  }
+
+  // ---------------------------------------------------
+  //  個別返信
+  // ---------------------------------------------------
+  async function sendReply(id) {
+    const ta  = document.getElementById(`r-${id}`);
+    const btn = ta.nextElementSibling;
+    const reply = ta.value.trim();
+    if (!reply) { showToast('返信内容を入力してください'); return; }
+
+    btn.disabled = true; btn.textContent = '送信中...';
+    try {
+      const res  = await fetch(`${GAS_URL}?action=reply&id=${enc(id)}&reply=${enc(reply)}`);
+      const data = await res.json();
+      showToast(data.message || '送信しました');
+      await loadQuestions();
+    } catch {
+      showToast('送信に失敗しました');
+      btn.disabled = false; btn.textContent = '返信を送信';
+    }
+  }
+
+  // ---------------------------------------------------
+  //  フィルター
+  // ---------------------------------------------------
+  function setFilter(f, el) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    renderList();
+  }
+
+  // ---------------------------------------------------
+  //  ユーティリティ
+  // ---------------------------------------------------
+  async function sha256(msg) {
+    const buf  = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  function enc(s) { return encodeURIComponent(s); }
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  // ---------------------------------------------------
+  //  パスワードハッシュ生成ヘルパー（コンソールで使用）
+  //  例: await generateHash("新しいパスワード")
+  // ---------------------------------------------------
+  window.generateHash = async (pw) => {
+    const h = await sha256(pw);
+    console.log('PW_HASH =', `'${h}'`);
+    return h;
+  };
+</script>
+</body>
+</html>
