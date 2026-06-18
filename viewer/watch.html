@@ -198,7 +198,7 @@
   let questions = [];
   let pollTimer = null;
 
-  // 起動時: 動画URL・タイトル取得
+  // 起動時: 動画URL・タイトル取得 + セッションキー照合
   (async () => {
     try {
       const [vRes, tRes] = await Promise.all([
@@ -209,8 +209,18 @@
       const tData = await tRes.json();
 
       if (tData.status === 'ok') {
-        document.getElementById('chatTitle').textContent = tData.title + ' - 質問チャット';
-        document.title = tData.title;
+        const title = tData.title;
+        document.getElementById('chatTitle').textContent = title + ' - 質問チャット';
+        document.title = title;
+
+        // ウェビナー名が変わったらセッションリセット
+        const savedKey = localStorage.getItem('webinar_key');
+        if (savedKey !== title) {
+          localStorage.removeItem('webinar_session');
+          localStorage.setItem('webinar_key', title);
+          session = null;
+          questions = [];
+        }
       }
       if (vData.status === 'ok' && vData.url) {
         const placeholder = document.getElementById('videoPlaceholder');
@@ -221,12 +231,12 @@
         placeholder.replaceWith(iframe);
       }
     } catch {}
+
+    // セッション復元（タイトル確認後）
+    if (session) { showChat(); loadMyQuestions(); startPolling(); }
   })();
 
-  // セッション復元
-  if (session) { showChat(); loadMyQuestions(); startPolling(); }
-
-  // フォーム送信
+  // フォーム送信 (セッション復元は上記async内で実行)
   document.getElementById('initForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('startBtn');
