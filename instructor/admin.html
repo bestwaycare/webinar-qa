@@ -90,6 +90,47 @@
     .container { max-width: 960px; margin: 0 auto; padding: 24px 20px; }
 
 
+    /* ---- タブ ---- */
+    .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; }
+    .tab-btn {
+      padding: 8px 20px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #64748b;
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.15s;
+    }
+    .tab-btn.active { color: #4f46e5; border-bottom-color: #4f46e5; }
+
+    /* ---- 参加者一覧 ---- */
+    #participantView { display: none; }
+    .participant-count { font-size: 0.82rem; color: #64748b; margin-bottom: 12px; }
+    .p-list { display: flex; flex-direction: column; gap: 8px; }
+    .p-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+    }
+    .p-avatar {
+      width: 36px; height: 36px;
+      background: #ede9fe;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem; font-weight: 700; color: #4f46e5;
+      flex-shrink: 0;
+    }
+    .p-name { font-weight: 700; font-size: 0.9rem; }
+    .p-email { font-size: 0.78rem; color: #64748b; }
+    .p-qcount { margin-left: auto; font-size: 0.75rem; color: #94a3b8; white-space: nowrap; }
+
     /* ---- フィルターバー ---- */
     .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
     .filter-btn {
@@ -264,15 +305,27 @@
       <div class="title-current" id="videoUrlCurrent"></div>
     </div>
 
-    <!-- フィルター -->
-    <div class="filter-bar">
-      <button class="filter-btn active" onclick="setFilter('all',this)">すべて</button>
-      <button class="filter-btn" onclick="setFilter('unanswered',this)">未回答のみ</button>
-      <button class="filter-btn" onclick="setFilter('answered',this)">回答済のみ</button>
+    <!-- タブ -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('messages',this)">💬 メッセージ</button>
+      <button class="tab-btn" onclick="switchTab('participants',this)">👥 参加者一覧</button>
     </div>
 
-    <!-- 質問一覧 -->
-    <div class="q-list" id="qList"><div class="empty">読み込み中...</div></div>
+    <!-- メッセージビュー -->
+    <div id="messageView">
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="setFilter('all',this)">すべて</button>
+        <button class="filter-btn" onclick="setFilter('unanswered',this)">未回答のみ</button>
+        <button class="filter-btn" onclick="setFilter('answered',this)">回答済のみ</button>
+      </div>
+      <div class="q-list" id="qList"><div class="empty">読み込み中...</div></div>
+    </div>
+
+    <!-- 参加者ビュー -->
+    <div id="participantView">
+      <div class="participant-count" id="participantCount"></div>
+      <div class="p-list" id="pList"></div>
+    </div>
   </div>
 </div>
 
@@ -485,6 +538,36 @@
   // ---------------------------------------------------
   //  フィルター
   // ---------------------------------------------------
+  function switchTab(tab, el) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('messageView').style.display     = tab === 'messages'     ? '' : 'none';
+    document.getElementById('participantView').style.display = tab === 'participants' ? '' : 'none';
+    if (tab === 'participants') renderParticipants();
+  }
+
+  function renderParticipants() {
+    const map = new Map();
+    allQ.forEach(q => {
+      if (!map.has(q.email)) {
+        map.set(q.email, { name: q.name, email: q.email, count: 0 });
+      }
+      map.get(q.email).count++;
+    });
+    const participants = [...map.values()].sort((a, b) => b.count - a.count);
+    document.getElementById('participantCount').textContent = `参加者 ${participants.length} 名`;
+    document.getElementById('pList').innerHTML = participants.map(p => `
+      <div class="p-card">
+        <div class="p-avatar">${esc(p.name.charAt(0))}</div>
+        <div>
+          <div class="p-name">${esc(p.name)}</div>
+          <div class="p-email">${esc(p.email)}</div>
+        </div>
+        <div class="p-qcount">メッセージ ${p.count} 件</div>
+      </div>
+    `).join('');
+  }
+
   function setFilter(f, el) {
     currentFilter = f;
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
