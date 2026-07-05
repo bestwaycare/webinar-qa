@@ -243,15 +243,13 @@
 
     <!-- 初期フォーム -->
     <div id="formView">
-      <p>メッセージは講師だけに届きます。お気軽にどうぞ。</p>
+      <p>名前を入力してご参加ください。メッセージは講師だけに届きます。</p>
       <form id="initForm">
         <label>お名前（ニックネームでもOK）</label>
         <input type="text" id="name" placeholder="例：田中 / たなか / Taro" required autocomplete="name">
         <label>メールアドレス</label>
         <input type="email" id="email" placeholder="you@example.com" required autocomplete="email">
-        <label>最初のメッセージ</label>
-        <input type="text" id="firstQ" placeholder="メッセージを入力してください..." required>
-        <button type="submit" class="btn-start" id="startBtn">送信する</button>
+        <button type="submit" class="btn-start" id="startBtn">参加する</button>
       </form>
     </div>
 
@@ -316,22 +314,21 @@
     if (session) { showChat(); loadMyQuestions(); startPolling(); }
   })();
 
-  // フォーム送信
+  // フォーム送信（名前+メールで参加、参加通知を自動送信）
   document.getElementById('initForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('startBtn');
-    btn.disabled = true; btn.textContent = '送信中...';
-    const name     = document.getElementById('name').value.trim();
-    const email    = document.getElementById('email').value.trim();
-    const question = document.getElementById('firstQ').value.trim();
+    btn.disabled = true; btn.textContent = '参加中...';
+    const name  = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
     try {
-      const id = await postQuestion(name, email, question);
+      await postQuestion(name, email, '(参加しました)');
       session = { name, email };
       localStorage.setItem('webinar_session', JSON.stringify(session));
-      questions = [{ id, text: question, status: '未回答', reply: '', repliedAt: '', time: now() }];
-      showChat(); renderMessages(); startPolling();
+      questions = [];
+      showChat(); startPolling();
     } catch {
-      btn.disabled = false; btn.textContent = '送信する';
+      btn.disabled = false; btn.textContent = '参加する';
     }
   });
 
@@ -385,7 +382,8 @@
 
   function renderMessages() {
     const box = document.getElementById('messages');
-    box.innerHTML = questions.map(q => `
+    // 参加通知は視聴者のチャットに表示しない
+    box.innerHTML = questions.filter(q => q.text !== '(参加しました)').map(q => `
       <div class="bubble-wrap me">
         <div class="bubble">${esc(q.text)}</div>
         <span class="bubble-time">${q.time || ''}</span>

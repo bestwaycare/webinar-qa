@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>参加者一覧</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .header h1 { font-size: 1rem; font-weight: 700; }
+    .count-badge {
+      background: #4f46e5;
+      color: #fff;
+      border-radius: 999px;
+      padding: 3px 12px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    .refresh-info {
+      margin-left: auto;
+      font-size: 0.72rem;
+      color: #475569;
+    }
+
+    .p-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .p-card {
+      background: #1e293b;
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .p-avatar {
+      width: 36px; height: 36px;
+      background: #312e81;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem; font-weight: 700; color: #a5b4fc;
+      flex-shrink: 0;
+    }
+    .p-name  { font-size: 0.92rem; font-weight: 700; color: #f1f5f9; }
+    .p-email { font-size: 0.75rem; color: #64748b; margin-top: 1px; }
+    .p-right { margin-left: auto; text-align: right; }
+    .p-msg-count {
+      font-size: 0.72rem;
+      color: #475569;
+    }
+    .p-msg-count.has-msg { color: #818cf8; }
+
+    .empty {
+      text-align: center;
+      color: #334155;
+      padding: 60px 0;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <span>👥</span>
+  <h1>参加者一覧</h1>
+  <span class="count-badge" id="countBadge">0 名</span>
+  <span class="refresh-info" id="refreshInfo">読み込み中...</span>
+</div>
+
+<div class="p-list" id="pList">
+  <div class="empty">参加者を待っています...</div>
+</div>
+
+<script>
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbymH9UaIIpVFHi_ggmOuOiifQpoMrhuPAnV3jOvdppcGi6klMgG00lGdOEHfqV_zU0y/exec';
+
+  let sec = 0;
+
+  async function load() {
+    try {
+      const res  = await fetch(`${GAS_URL}?action=list`);
+      const data = await res.json();
+      if (data.status !== 'ok') return;
+
+      // メールアドレスでグルーピング（参加通知以外もカウント）
+      const map = new Map();
+      data.questions.forEach(q => {
+        if (!map.has(q.email)) {
+          map.set(q.email, { name: q.name, email: q.email, msgCount: 0 });
+        }
+        if (q.question !== '(参加しました)') {
+          map.get(q.email).msgCount++;
+        }
+      });
+
+      const participants = [...map.values()];
+      document.getElementById('countBadge').textContent = `${participants.length} 名`;
+
+      if (participants.length === 0) {
+        document.getElementById('pList').innerHTML = '<div class="empty">参加者を待っています...</div>';
+        return;
+      }
+
+      document.getElementById('pList').innerHTML = participants.map(p => `
+        <div class="p-card">
+          <div class="p-avatar">${esc(p.name.charAt(0))}</div>
+          <div>
+            <div class="p-name">${esc(p.name)}</div>
+            <div class="p-email">${esc(p.email)}</div>
+          </div>
+          <div class="p-right">
+            <div class="p-msg-count ${p.msgCount > 0 ? 'has-msg' : ''}">
+              ${p.msgCount > 0 ? `💬 ${p.msgCount} 件` : '閲覧中'}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    } catch {}
+
+    document.getElementById('refreshInfo').textContent = `最終更新: ${new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}`;
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // 初回ロード + 10秒ごと自動更新
+  load();
+  setInterval(load, 10000);
+</script>
+</body>
+</html>
