@@ -447,22 +447,16 @@
 
   function renderMessages() {
     const box = document.getElementById('messages');
-    // 参加通知は視聴者のチャットに表示しない
-    box.innerHTML = questions.filter(q => q.text !== '(参加しました)').map(q => `
+    const msgs = questions.filter(q => q.text !== '(参加しました)');
+    if (!msgs.length) {
+      box.innerHTML = '<div class="waiting" style="justify-content:center;padding:20px 0;">メッセージを送信してください</div>';
+      return;
+    }
+    box.innerHTML = msgs.map(q => `
       <div class="bubble-wrap me">
         <div class="bubble">${esc(q.text)}</div>
-        <span class="bubble-time">${q.time || ''}</span>
+        <span class="bubble-time">${q.time || ''} · 講師に送信しました</span>
       </div>
-      ${q.status === '回答済' && q.reply
-        ? `<div class="bubble-wrap them">
-             <div class="bubble">${esc(q.reply)}</div>
-             <span class="bubble-time">講師 · ${q.repliedAt || ''}</span>
-           </div>`
-        : `<div class="waiting">
-             <div class="dots"><span></span><span></span><span></span></div>
-             講師が確認しています
-           </div>`
-      }
     `).join('');
     box.scrollTop = box.scrollHeight;
   }

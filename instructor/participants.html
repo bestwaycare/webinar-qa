@@ -124,10 +124,19 @@
 
       if (qData.status !== 'ok') return;
 
-      // セッション開始後の参加者のみ抽出
+      // 今日の日付 yyyy/MM/dd（GASタイムスタンプと同形式）
+      const _n = new Date();
+      const todayStr = _n.getFullYear() + '/' +
+        String(_n.getMonth()+1).padStart(2,'0') + '/' +
+        String(_n.getDate()).padStart(2,'0');
+
+      // セッション開始後かつ当日の参加者のみ抽出
       const map = new Map();
       qData.questions.forEach(q => {
         const qTime = parseGasDate(q.timestamp);
+        // 当日チェック（タイムスタンプの先頭10文字 yyyy/MM/dd を比較）
+        const qDateStr = String(q.timestamp).slice(0, 10);
+        if (qDateStr !== todayStr) return; // 当日以外は除外
         if (sessionStart && qTime && qTime < sessionStart) return; // 今回セッション以前は除外
 
         if (!map.has(q.name)) {

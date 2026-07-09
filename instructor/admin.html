@@ -191,42 +191,32 @@
 
     .q-text { font-size: 0.92rem; line-height: 1.6; margin-bottom: 14px; }
 
-    .reply-area textarea {
-      width: 100%;
-      border: 1.5px solid #e2e8f0;
-      border-radius: 10px;
-      padding: 10px 13px;
-      font-size: 0.9rem;
-      resize: vertical;
-      min-height: 72px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    .reply-area textarea:focus { border-color: #4f46e5; }
-    .btn-reply {
-      margin-top: 8px;
-      background: #4f46e5;
-      color: #fff;
-      border: none;
+    .btn-confirm {
+      margin-top: 10px;
+      background: none;
+      color: #4f46e5;
+      border: 1.5px solid #4f46e5;
       border-radius: 9px;
-      padding: 9px 20px;
-      font-size: 0.88rem;
+      padding: 7px 18px;
+      font-size: 0.84rem;
       font-weight: 700;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: all 0.2s;
     }
-    .btn-reply:hover { background: #4338ca; }
-    .btn-reply:disabled { background: #94a3b8; cursor: not-allowed; }
+    .btn-confirm:hover { background: #4f46e5; color: #fff; }
+    .btn-confirm:disabled { border-color: #94a3b8; color: #94a3b8; cursor: not-allowed; }
 
-    .replied-box {
+    .confirmed-badge {
+      display: inline-block;
+      margin-top: 10px;
       background: #f0fdf4;
       border: 1px solid #bbf7d0;
-      border-radius: 10px;
-      padding: 12px 15px;
-      margin-top: 10px;
+      border-radius: 8px;
+      padding: 5px 14px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #15803d;
     }
-    .replied-box .rl { font-size: 0.72rem; font-weight: 700; color: #15803d; margin-bottom: 4px; }
-    .replied-box .rt { font-size: 0.88rem; color: #1e293b; }
 
     /* ---- タイトル設定 ---- */
     .title-box {
@@ -548,37 +538,27 @@
         </div>
         <div class="q-text">${esc(q.question)}</div>
         ${q.status === '回答済'
-          ? `<div class="replied-box">
-               <div class="rl">回答済 · ${q.repliedAt}</div>
-               <div class="rt">${esc(q.reply)}</div>
-             </div>`
-          : `<div class="reply-area">
-               <textarea id="r-${q.id}" placeholder="${esc(q.name)} さんへの返信..."></textarea>
-               <button class="btn-reply" onclick="sendReply('${q.id}')">返信を送信</button>
-             </div>`
+          ? `<span class="confirmed-badge">✅ 確認済み · ${q.repliedAt}</span>`
+          : `<button class="btn-confirm" id="btn-${q.id}" onclick="confirmMsg('${q.id}')">✔ 確認済みにする</button>`
         }
       </div>
     `).join('');
   }
 
   // ---------------------------------------------------
-  //  個別返信
+  //  確認済みにする
   // ---------------------------------------------------
-  async function sendReply(id) {
-    const ta  = document.getElementById(`r-${id}`);
-    const btn = ta.nextElementSibling;
-    const reply = ta.value.trim();
-    if (!reply) { showToast('返信内容を入力してください'); return; }
-
-    btn.disabled = true; btn.textContent = '送信中...';
+  async function confirmMsg(id) {
+    const btn = document.getElementById(`btn-${id}`);
+    btn.disabled = true; btn.textContent = '処理中...';
     try {
-      const res  = await fetch(`${GAS_URL}?action=reply&id=${enc(id)}&reply=${enc(reply)}`);
+      const res  = await fetch(`${GAS_URL}?action=reply&id=${enc(id)}&reply=${enc('(確認済み)')}`);
       const data = await res.json();
-      showToast(data.message || '送信しました');
+      showToast('確認済みにしました');
       await loadQuestions();
     } catch {
-      showToast('送信に失敗しました');
-      btn.disabled = false; btn.textContent = '返信を送信';
+      showToast('失敗しました');
+      btn.disabled = false; btn.textContent = '✔ 確認済みにする';
     }
   }
 
