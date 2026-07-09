@@ -13,7 +13,6 @@
       min-height: 100vh;
       padding: 20px;
     }
-
     .header {
       display: flex;
       align-items: center;
@@ -31,18 +30,17 @@
       font-size: 0.8rem;
       font-weight: 700;
     }
+    .session-info {
+      font-size: 0.72rem;
+      color: #334155;
+      margin-left: 4px;
+    }
     .refresh-info {
       margin-left: auto;
       font-size: 0.72rem;
       color: #475569;
     }
-
-    .p-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
+    .p-list { display: flex; flex-direction: column; gap: 8px; }
     .p-card {
       background: #1e293b;
       border-radius: 10px;
@@ -56,7 +54,6 @@
       from { opacity: 0; transform: translateY(4px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-
     .p-avatar {
       width: 36px; height: 36px;
       background: #312e81;
@@ -66,14 +63,14 @@
       flex-shrink: 0;
     }
     .p-name  { font-size: 0.92rem; font-weight: 700; color: #f1f5f9; }
-    .p-email { font-size: 0.75rem; color: #64748b; margin-top: 1px; }
-    .p-right { margin-left: auto; text-align: right; }
+    .p-time  { font-size: 0.72rem; color: #475569; margin-top: 1px; }
     .p-msg-count {
-      font-size: 0.72rem;
+      margin-left: auto;
+      font-size: 0.75rem;
       color: #475569;
+      white-space: nowrap;
     }
     .p-msg-count.has-msg { color: #818cf8; }
-
     .empty {
       text-align: center;
       color: #334155;
@@ -88,6 +85,7 @@
   <span>👥</span>
   <h1>参加者一覧</h1>
   <span class="count-badge" id="countBadge">0 名</span>
+  <span class="session-info" id="sessionInfo"></span>
   <span class="refresh-info" id="refreshInfo">読み込み中...</span>
 </div>
 
@@ -98,22 +96,45 @@
 <script>
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbymH9UaIIpVFHi_ggmOuOiifQpoMrhuPAnV3jOvdppcGi6klMgG00lGdOEHfqV_zU0y/exec';
 
-  let sec = 0;
+  let sessionStart = null;
+
+  // GASのタイムスタンプ形式 "yyyy/MM/dd HH:mm:ss" をDateに変換
+  function parseGasDate(s) {
+    if (!s) return null;
+    const m = String(s).match(/(\d{4})\/(\d{2})\/(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+    if (!m) return null;
+    // GASはJST、Dateはローカル時刻として解釈させる
+    return new Date(m[1], m[2]-1, m[3], m[4], m[5], m[6]);
+  }
 
   async function load() {
     try {
-      const res  = await fetch(`${GAS_URL}?action=list`);
-      const data = await res.json();
-      if (data.status !== 'ok') return;
+      const [tRes, qRes] = await Promise.all([
+        fetch(`${GAS_URL}?action=getTitle`),
+        fetch(`${GAS_URL}?action=list`),
+      ]);
+      const tData = await tRes.json();
+      const qData = await qRes.json();
 
-      // メールアドレスでグルーピング（参加通知以外もカウント）
+      if (tData.status === 'ok' && tData.sessionStart) {
+        sessionStart = new Date(tData.sessionStart);
+        document.getElementById('sessionInfo').textContent =
+          `（セッション開始: ${sessionStart.toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'})}〜）`;
+      }
+
+      if (qData.status !== 'ok') return;
+
+      // セッション開始後の参加者のみ抽出
       const map = new Map();
-      data.questions.forEach(q => {
-        if (!map.has(q.email)) {
-          map.set(q.email, { name: q.name, email: q.email, msgCount: 0 });
+      qData.questions.forEach(q => {
+        const qTime = parseGasDate(q.timestamp);
+        if (sessionStart && qTime && qTime < sessionStart) return; // 今回セッション以前は除外
+
+        if (!map.has(q.name)) {
+          map.set(q.name, { name: q.name, joinedAt: q.timestamp, msgCount: 0 });
         }
         if (q.question !== '(参加しました)') {
-          map.get(q.email).msgCount++;
+          map.get(q.name).msgCount++;
         }
       });
 
@@ -122,33 +143,36 @@
 
       if (participants.length === 0) {
         document.getElementById('pList').innerHTML = '<div class="empty">参加者を待っています...</div>';
-        return;
-      }
-
-      document.getElementById('pList').innerHTML = participants.map(p => `
-        <div class="p-card">
-          <div class="p-avatar">${esc(p.name.charAt(0))}</div>
-          <div>
-            <div class="p-name">${esc(p.name)}</div>
-            <div class="p-email">${esc(p.email)}</div>
-          </div>
-          <div class="p-right">
+      } else {
+        document.getElementById('pList').innerHTML = participants.map(p => `
+          <div class="p-card">
+            <div class="p-avatar">${esc(p.name.charAt(0))}</div>
+            <div>
+              <div class="p-name">${esc(p.name)}</div>
+              <div class="p-time">参加: ${formatTime(p.joinedAt)}</div>
+            </div>
             <div class="p-msg-count ${p.msgCount > 0 ? 'has-msg' : ''}">
               ${p.msgCount > 0 ? `💬 ${p.msgCount} 件` : '閲覧中'}
             </div>
           </div>
-        </div>
-      `).join('');
-    } catch {}
+        `).join('');
+      }
+    } catch(err) {}
 
-    document.getElementById('refreshInfo').textContent = `最終更新: ${new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}`;
+    document.getElementById('refreshInfo').textContent =
+      `更新: ${new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit', second:'2-digit'})}`;
+  }
+
+  function formatTime(ts) {
+    const d = parseGasDate(ts);
+    if (!d) return ts || '';
+    return d.toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
   }
 
   function esc(s) {
     return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  // 初回ロード + 10秒ごと自動更新
   load();
   setInterval(load, 10000);
 </script>

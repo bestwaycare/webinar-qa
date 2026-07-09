@@ -82,31 +82,34 @@
     /* 初期フォーム */
     #formView {
       flex: 1;
-      padding: 14px 16px;
+      padding: 10px 14px;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
     #formView p {
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       color: #64748b;
-      margin-bottom: 14px;
-      line-height: 1.5;
+      margin-bottom: 10px;
+      line-height: 1.4;
     }
     label {
       display: block;
-      font-size: 0.73rem;
+      font-size: 0.72rem;
       font-weight: 700;
       color: #64748b;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
     input {
       width: 100%;
       border: 1.5px solid #e2e8f0;
       border-radius: 8px;
-      padding: 10px 12px;
-      font-size: 1rem; /* スマホでズームしないよう16px相当 */
+      padding: 8px 12px;
+      font-size: 1rem;
       outline: none;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       transition: border-color 0.2s;
       -webkit-appearance: none;
     }
@@ -117,7 +120,7 @@
       color: #fff;
       border: none;
       border-radius: 8px;
-      padding: 12px;
+      padding: 10px;
       font-size: 0.95rem;
       font-weight: 700;
       cursor: pointer;
@@ -247,8 +250,6 @@
       <form id="initForm">
         <label>お名前（ニックネームでもOK）</label>
         <input type="text" id="name" placeholder="例：田中 / たなか / Taro" required autocomplete="name">
-        <label>メールアドレス</label>
-        <input type="email" id="email" placeholder="you@example.com" required autocomplete="email">
         <button type="submit" class="btn-start" id="startBtn">参加する</button>
       </form>
     </div>
@@ -275,6 +276,16 @@
   let session   = JSON.parse(localStorage.getItem('webinar_session') || 'null');
   let questions = [];
   let pollTimer = null;
+
+  // メールの代わりに端末固有IDを使用
+  function getViewerId() {
+    let id = localStorage.getItem('viewer_id');
+    if (!id) {
+      id = 'v_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem('viewer_id', id);
+    }
+    return id;
+  }
 
   // 起動時: 動画URL・タイトル取得 + セッションキー照合
   (async () => {
@@ -314,16 +325,16 @@
     if (session) { showChat(); loadMyQuestions(); startPolling(); }
   })();
 
-  // フォーム送信（名前+メールで参加、参加通知を自動送信）
+  // フォーム送信（名前だけで参加）
   document.getElementById('initForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('startBtn');
     btn.disabled = true; btn.textContent = '参加中...';
-    const name  = document.getElementById('name').value.trim();
-    const email = document.getElementById('email').value.trim();
+    const name     = document.getElementById('name').value.trim();
+    const viewerId = getViewerId();
     try {
-      await postQuestion(name, email, '(参加しました)');
-      session = { name, email };
+      await postQuestion(name, viewerId, '(参加しました)');
+      session = { name, email: viewerId };
       localStorage.setItem('webinar_session', JSON.stringify(session));
       questions = [];
       showChat(); startPolling();
