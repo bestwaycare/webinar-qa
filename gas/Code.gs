@@ -8,9 +8,10 @@ const INSTRUCTOR_EMAIL = 'bestway.mabuchi@gmail.com';
 
 const props = () => PropertiesService.getScriptProperties();
 
-function getTitle()      { return props().getProperty('WEBINAR_TITLE') || 'ウェビナータイトル'; }
-function getVideoUrl()   { return props().getProperty('VIDEO_URL') || ''; }
+function getTitle()        { return props().getProperty('WEBINAR_TITLE') || 'ウェビナータイトル'; }
+function getVideoUrl()     { return props().getProperty('VIDEO_URL') || ''; }
 function getSessionStart() { return props().getProperty('SESSION_START') || ''; }
+function getBroadcastEnded() { return props().getProperty('BROADCAST_ENDED') === 'true'; }
 
 const COL = {
   ID: 1, TIMESTAMP: 2, NAME: 3, EMAIL: 4,
@@ -52,8 +53,9 @@ function doGet(e) {
     if (action === 'list')        return json({ status: 'ok', questions: getQuestions() });
     if (action === 'listByEmail') return json({ status: 'ok', questions: getByEmail(e.parameter.email) });
     if (action === 'reply')       return json(sendReply(e.parameter.id, e.parameter.reply));
-    if (action === 'getTitle')    return json({ status: 'ok', title: getTitle(), sessionStart: getSessionStart() });
+    if (action === 'getTitle')    return json({ status: 'ok', title: getTitle(), sessionStart: getSessionStart(), broadcastEnded: getBroadcastEnded() });
     if (action === 'setTitle')    return json(setTitleProp(e.parameter.title));
+    if (action === 'setBroadcastStatus') return json(setBroadcastStatusProp(e.parameter.status));
     if (action === 'getVideoUrl') return json({ status: 'ok', url: getVideoUrl() });
     if (action === 'setVideoUrl') return json(setVideoUrlProp(e.parameter.url));
     return json({ status: 'error', message: '不明なアクション' });
@@ -126,7 +128,13 @@ function setTitleProp(title) {
   if (!title) return { status: 'error', message: 'title が必要です' };
   props().setProperty('WEBINAR_TITLE', title);
   props().setProperty('SESSION_START', new Date().toISOString());
+  props().setProperty('BROADCAST_ENDED', 'false');
   return { status: 'ok', title };
+}
+
+function setBroadcastStatusProp(status) {
+  props().setProperty('BROADCAST_ENDED', status === 'ended' ? 'true' : 'false');
+  return { status: 'ok' };
 }
 
 function setVideoUrlProp(url) {

@@ -85,6 +85,20 @@
       transition: all 0.15s;
     }
     .refresh-btn:hover, .logout-btn:hover { background: rgba(255,255,255,0.1); }
+    .end-broadcast-btn {
+      border: 1.5px solid #fca5a5;
+      background: none;
+      color: #fca5a5;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .end-broadcast-btn:hover { background: rgba(239,68,68,0.15); }
+    .end-broadcast-btn.ended { border-color: #4ade80; color: #4ade80; }
+    .end-broadcast-btn.ended:hover { background: rgba(74,222,128,0.15); }
     .auto-label { font-size: 0.72rem; color: #64748b; }
 
     .container { max-width: 960px; margin: 0 auto; padding: 24px 20px; }
@@ -279,6 +293,7 @@
     <span class="badge" id="unreadBadge">---</span>
     <div class="header-right">
       <span class="auto-label" id="autoLabel"></span>
+      <button class="end-broadcast-btn" id="endBroadcastBtn" onclick="toggleBroadcast()">⏹ 配信終了</button>
       <button class="refresh-btn" onclick="loadQuestions()">更新</button>
       <button class="logout-btn" onclick="logout()">ログアウト</button>
     </div>
@@ -342,6 +357,7 @@
   let allQ = [];
   let currentFilter = 'all';
   let pollTimer = null;
+  let broadcastEnded = false;
 
   // ---------------------------------------------------
   //  ログイン
@@ -409,8 +425,39 @@
       if (data.status === 'ok') {
         document.getElementById('titleInput').value = data.title;
         document.getElementById('titleCurrent').textContent = `現在: ${data.title}`;
+        broadcastEnded = !!data.broadcastEnded;
+        updateEndBroadcastBtn();
       }
     } catch {}
+  }
+
+  function updateEndBroadcastBtn() {
+    const btn = document.getElementById('endBroadcastBtn');
+    if (broadcastEnded) {
+      btn.textContent = '▶ 配信再開';
+      btn.classList.add('ended');
+    } else {
+      btn.textContent = '⏹ 配信終了';
+      btn.classList.remove('ended');
+    }
+  }
+
+  async function toggleBroadcast() {
+    const btn = document.getElementById('endBroadcastBtn');
+    const newStatus = broadcastEnded ? 'active' : 'ended';
+    const label = broadcastEnded ? '配信を再開' : '配信を終了';
+    if (!broadcastEnded && !confirm(`${label}しますか？\n受講生の画面に終了メッセージが表示されます。`)) return;
+    btn.disabled = true;
+    try {
+      const res  = await fetch(`${GAS_URL}?action=setBroadcastStatus&status=${newStatus}`);
+      const data = await res.json();
+      if (data.status === 'ok') {
+        broadcastEnded = !broadcastEnded;
+        updateEndBroadcastBtn();
+        showToast(broadcastEnded ? '配信を終了しました' : '配信を再開しました');
+      }
+    } catch { showToast('操作に失敗しました'); }
+    finally { btn.disabled = false; }
   }
 
   async function saveTitle() {

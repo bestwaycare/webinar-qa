@@ -47,6 +47,22 @@
     }
     .video-placeholder .icon { font-size: 2rem; }
 
+    /* 配信終了画面 */
+    #endView {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: #f8fafc;
+      padding: 24px;
+      text-align: center;
+    }
+    #endView .end-icon { font-size: 2.4rem; }
+    #endView h2 { font-size: 1rem; font-weight: 700; color: #1e293b; }
+    #endView p  { font-size: 0.82rem; color: #64748b; line-height: 1.5; }
+
     /* ---- メッセージエリア ---- */
     .chat-area {
       flex: 1;
@@ -254,6 +270,13 @@
       </form>
     </div>
 
+    <!-- 配信終了 -->
+    <div id="endView">
+      <div class="end-icon">📺</div>
+      <h2>配信が終了しました</h2>
+      <p>本日はご参加いただきありがとうございました。</p>
+    </div>
+
     <!-- チャット -->
     <div id="chatView">
       <div class="messages" id="messages"></div>
@@ -273,11 +296,12 @@
 <script>
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbymH9UaIIpVFHi_ggmOuOiifQpoMrhuPAnV3jOvdppcGi6klMgG00lGdOEHfqV_zU0y/exec';
 
-  let session   = JSON.parse(localStorage.getItem('webinar_session') || 'null');
-  let questions = [];
-  let pollTimer = null;
+  let session        = JSON.parse(localStorage.getItem('webinar_session') || 'null');
+  let questions      = [];
+  let pollTimer      = null;
+  let statusTimer    = null;
+  let pendingVideoUrl = null;
 
-  // メールの代わりに端末固有IDを使用
   function getViewerId() {
     let id = localStorage.getItem('viewer_id');
     if (!id) {
@@ -285,6 +309,28 @@
       localStorage.setItem('viewer_id', id);
     }
     return id;
+  }
+
+  function insertVideo() {
+    if (!pendingVideoUrl) return;
+    const placeholder = document.getElementById('videoPlaceholder');
+    if (!placeholder) return; // すでに差し替え済み
+    const iframe = document.createElement('iframe');
+    iframe.src = pendingVideoUrl.includes('?') ? pendingVideoUrl + '&embed=true' : pendingVideoUrl + '?embed=true';
+    iframe.allow = 'autoplay; fullscreen';
+    iframe.allowFullscreen = true;
+    placeholder.replaceWith(iframe);
+  }
+
+  function showEndScreen() {
+    localStorage.removeItem('webinar_session');
+    session = null;
+    if (pollTimer)   clearInterval(pollTimer);
+    if (statusTimer) clearInterval(statusTimer);
+    document.getElementById('formView').style.display = 'none';
+    document.getElementById('chatView').style.display = 'none';
+    const ev = document.getElementById('endView');
+    ev.style.display = 'flex';
   }
 
   // 起動時: 動画URL・タイトル取得 + セッションキー照合
@@ -310,20 +356,26 @@
           session = null;
           questions = [];
         }
+
+        if (tData.broadcastEnded) { showEndScreen(); return; }
       }
       if (vData.status === 'ok' && vData.url) {
-        const placeholder = document.getElementById('videoPlaceholder');
-        const iframe = document.createElement('iframe');
-        iframe.src = vData.url.includes('?') ? vData.url + '&embed=true' : vData.url + '?embed=true';
-        iframe.allow = 'autoplay; fullscreen';
-        iframe.allowFullscreen = true;
-        placeholder.replaceWith(iframe);
+        pendingVideoUrl = vData.url;
       }
     } catch {}
 
     // セッション復元（タイトル確認後）
-    if (session) { showChat(); loadMyQuestions(); startPolling(); }
+    if (session) { insertVideo(); showChat(); loadMyQuestions(); startPolling(); }
   })();
+
+  // 配信ステータスを定期チェック（30秒ごと）
+  async function checkBroadcastStatus() {
+    try {
+      const res  = await fetch(`${GAS_URL}?action=getTitle`);
+      const data = await res.json();
+      if (data.status === 'ok' && data.broadcastEnded) showEndScreen();
+    } catch {}
+  }
 
   // フォーム送信（名前だけで参加）
   document.getElementById('initForm').addEventListener('submit', async (e) => {
@@ -337,7 +389,7 @@
       session = { name, email: viewerId };
       localStorage.setItem('webinar_session', JSON.stringify(session));
       questions = [];
-      showChat(); startPolling();
+      insertVideo(); showChat(); startPolling();
     } catch {
       btn.disabled = false; btn.textContent = '参加する';
     }
@@ -364,8 +416,10 @@
   }
 
   function startPolling() {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = setInterval(loadMyQuestions, 10000);
+    if (pollTimer)   clearInterval(pollTimer);
+    if (statusTimer) clearInterval(statusTimer);
+    pollTimer   = setInterval(loadMyQuestions, 10000);
+    statusTimer = setInterval(checkBroadcastStatus, 30000);
   }
 
   async function loadMyQuestions() {
