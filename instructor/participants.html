@@ -98,13 +98,21 @@
 
   let sessionStart = null;
 
-  // GASのタイムスタンプ形式 "yyyy/MM/dd HH:mm:ss" をDateに変換
-  function parseGasDate(s) {
+  // タイムスタンプ → Date（GAS形式 "yyyy/MM/dd HH:mm:ss" またはISO文字列どちらでも対応）
+  function parseTs(s) {
     if (!s) return null;
     const m = String(s).match(/(\d{4})\/(\d{2})\/(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
-    if (!m) return null;
-    // GASはJST、Dateはローカル時刻として解釈させる
-    return new Date(m[1], m[2]-1, m[3], m[4], m[5], m[6]);
+    if (m) return new Date(m[1], m[2]-1, m[3], m[4], m[5], m[6]);
+    const d = new Date(s);
+    return isNaN(d) ? null : d;
+  }
+
+  // Date → "yyyy/MM/dd" 文字列
+  function datePart(d) {
+    if (!d) return null;
+    return d.getFullYear() + '/' +
+      String(d.getMonth()+1).padStart(2,'0') + '/' +
+      String(d.getDate()).padStart(2,'0');
   }
 
   async function load() {
@@ -124,19 +132,14 @@
 
       if (qData.status !== 'ok') return;
 
-      // 今日の日付 yyyy/MM/dd（GASタイムスタンプと同形式）
-      const _n = new Date();
-      const todayStr = _n.getFullYear() + '/' +
-        String(_n.getMonth()+1).padStart(2,'0') + '/' +
-        String(_n.getDate()).padStart(2,'0');
+      // 今日の日付文字列
+      const todayStr = datePart(new Date());
 
       // セッション開始後かつ当日の参加者のみ抽出
       const map = new Map();
       qData.questions.forEach(q => {
-        const qTime = parseGasDate(q.timestamp);
-        // 当日チェック（タイムスタンプの先頭10文字 yyyy/MM/dd を比較）
-        const qDateStr = String(q.timestamp).slice(0, 10);
-        if (qDateStr !== todayStr) return; // 当日以外は除外
+        const qTime = parseTs(q.timestamp);
+        if (datePart(qTime) !== todayStr) return;           // 当日以外は除外
         if (sessionStart && qTime && qTime < sessionStart) return; // 今回セッション以前は除外
 
         if (!map.has(q.name)) {
@@ -173,7 +176,7 @@
   }
 
   function formatTime(ts) {
-    const d = parseGasDate(ts);
+    const d = parseTs(ts);
     if (!d) return ts || '';
     return d.toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
   }

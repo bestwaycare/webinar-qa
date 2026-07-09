@@ -300,6 +300,7 @@
   let questions      = [];
   let pollTimer      = null;
   let statusTimer    = null;
+  let preJoinTimer   = null;
   let pendingVideoUrl = null;
 
   function getViewerId() {
@@ -365,8 +366,38 @@
     } catch {}
 
     // セッション復元（タイトル確認後）
-    if (session) { insertVideo(); showChat(); loadMyQuestions(); startPolling(); }
+    if (session) {
+      insertVideo(); showChat(); loadMyQuestions(); startPolling();
+    } else {
+      startPreJoinPolling();
+    }
   })();
+
+  // 参加前: 10秒ごとにタイトル・動画URL・配信状態を再チェック
+  function startPreJoinPolling() {
+    if (preJoinTimer) return;
+    preJoinTimer = setInterval(async () => {
+      if (session) { clearInterval(preJoinTimer); preJoinTimer = null; return; }
+      try {
+        const [vRes, tRes] = await Promise.all([
+          fetch(`${GAS_URL}?action=getVideoUrl`),
+          fetch(`${GAS_URL}?action=getTitle`),
+        ]);
+        const vData = await vRes.json();
+        const tData = await tRes.json();
+
+        if (tData.status === 'ok') {
+          document.getElementById('chatTitle').textContent =
+            tData.title + ' — 講師へのメッセージ（講師にしか届きません）';
+          document.title = tData.title;
+          if (tData.broadcastEnded) { clearInterval(preJoinTimer); preJoinTimer = null; showEndScreen(); return; }
+        }
+        if (vData.status === 'ok' && vData.url && !pendingVideoUrl) {
+          pendingVideoUrl = vData.url;
+        }
+      } catch {}
+    }, 10000);
+  }
 
   // 配信ステータスを定期チェック（30秒ごと）
   async function checkBroadcastStatus() {
